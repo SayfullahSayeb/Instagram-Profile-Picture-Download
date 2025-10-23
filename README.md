@@ -1,1 +1,12 @@
 # Instagram-Profile-Picture-Download
+
+## Installation
+
+1. Install a userscript manager:
+   - [Tampermonkey](https://www.tampermonkey.net/) (Chrome, Firefox, Edge, Safari, Opera)
+   - [Greasemonkey](https://www.greasespot.net/) (Firefox)
+   - [Violentmonkey](https://violentmonkey.github.io/) (Chrome, Firefox, Edge)
+
+2. Click here to install: [main.js](https://raw.githubusercontent.com/SayfullahSayeb/Instagram-Profile-Picture-Download/refs/heads/main/main.js)
+
+3. Your userscript manager will prompt you to install - click "Install"
