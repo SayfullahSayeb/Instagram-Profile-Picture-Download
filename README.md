@@ -7,9 +7,8 @@
    - [Greasemonkey](https://www.greasespot.net/) (Firefox)
    - [Violentmonkey](https://violentmonkey.github.io/) (Chrome, Firefox, Edge)
 
-2. Click here to install: <a href="https://raw.githubusercontent.com/SayfullahSayeb/Instagram-Profile-Picture-Download/main/main.user.js" target="_blank">main.user.js</a>
+2. Click here to install: [main.js](https://raw.githubusercontent.com/SayfullahSayeb/Instagram-Profile-Picture-Download/main/main.user.js)
+
 
 
 3. Your userscript manager will prompt you to install - click "Install"
-
-<a href="https://example.com/" target="_blank">Open Example in new tab</a>
