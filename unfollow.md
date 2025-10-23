@@ -1,7 +1,8 @@
 # Visit Instagram, open Following, paste this code in the console, and enter. 
 
 
- ```(async () => {
+ ```
+ (async () => {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const unfollowButtons = document.querySelectorAll('button');
