@@ -11,3 +11,5 @@
 
 
 3. Your userscript manager will prompt you to install - click "Install"
+
+<a href="https://example.com/" target="_blank">Open Example in new tab</a>
