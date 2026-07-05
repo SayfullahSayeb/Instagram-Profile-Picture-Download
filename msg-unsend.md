@@ -2,52 +2,81 @@
 
 
  ```
- // === Instagram Unsender – skip non‑your messages, auto‑scroll, no skipping ===
+// === Instagram Unsender – skip others without opening menu ===
 (async function() {
-    const MAX = 50;                 // max messages to unsend
-    const DELAY = 2000;             // wait between unsends
-    const SCROLL_DELAY = 2500;      // wait after scrolling for new messages
-    const SCROLL_AMOUNT = 800;      // pixels to scroll up each time
+    const MAX = 50;
+    const DELAY = 2000;
+    const SCROLL_DELAY = 3000;
+    const SCROLL_AMOUNT = 900;
     const MENU_WAIT = 2000;
     const CONFIRM_WAIT = 800;
     const HOVER_WAIT = 800;
 
     const wait = ms => new Promise(r => setTimeout(r, ms));
-    const processedSet = new Set(); // store unique IDs of messages we've already checked
+    const processed = new Set();
 
-    // ----- Helper: get a unique ID for a message -----
-    function getMessageId(msg) {
-        // Combine the text content and the timestamp (if present) to make a semi‑unique ID
-        const text = msg.textContent.trim().slice(0, 50); // first 50 chars
-        // Find timestamp near the message
-        const timeEl = msg.querySelector('time, span[class*="time"], span[aria-label*="time"]');
-        const time = timeEl ? timeEl.textContent.trim() : '';
-        return text + '|' + time;
+    const myUsername = prompt("Enter your Instagram username (e.g., saylane7):");
+    if (!myUsername) {
+        console.log('❌ Cancelled.');
+        return;
+    }
+    console.log(`🔍 Targeting only @${myUsername} – processing from bottom up.`);
+
+    // ---- Scroll container ----
+    function getScrollContainer() {
+        const candidates = document.querySelectorAll('div.html-div.xdj266r.x14z9mp.xat24cr.x1lziwak.xexx8yu');
+        for (const el of candidates) {
+            const style = getComputedStyle(el);
+            if ((style.overflowY === 'scroll' || style.overflowY === 'auto') &&
+                el.scrollHeight > el.clientHeight) return el;
+        }
+        for (const el of document.querySelectorAll('*')) {
+            const style = getComputedStyle(el);
+            if ((style.overflowY === 'scroll' || style.overflowY === 'auto') &&
+                el.scrollHeight > el.clientHeight) return el;
+        }
+        return document.documentElement;
     }
 
-    // ----- Helper: reliable click -----
+    async function scrollUp() {
+        const container = getScrollContainer();
+        if (!container) return false;
+        const before = container.scrollTop;
+        container.scrollBy({ top: -SCROLL_AMOUNT, behavior: 'smooth' });
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+        await wait(SCROLL_DELAY);
+        const after = container.scrollTop;
+        if (before !== after) console.log(`📜 Scrolled up: ${before - after}px`);
+        return after < before;
+    }
+
+    // ---- Unique ID: text + timestamp (no aria-label dependency) ----
+    function getMessageId(msg) {
+        const text = msg.textContent.trim().slice(0, 80);
+        const timeEl = msg.querySelector('time, span[class*="time"], span[aria-label*="time"]');
+        const time = timeEl ? timeEl.textContent.trim() : '';
+        return `${text}|${time}`;
+    }
+
     function clickElement(el) {
         if (!el) return false;
         el.scrollIntoView({ block: 'center' });
         el.focus();
         el.click();
-        ['mousedown', 'mouseup', 'click'].forEach(type => {
-            el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
-        });
+        ['mousedown', 'mouseup', 'click'].forEach(type =>
+            el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }))
+        );
         return true;
     }
 
-    // ----- Find "Unsend" button anywhere -----
     function findUnsendButton() {
         const byText = Array.from(document.querySelectorAll('button, div[role="button"]'))
             .find(el => el.textContent.trim().toLowerCase() === 'unsend');
         if (byText) return byText;
         const svg = document.querySelector('svg[aria-label="Unsend"]');
-        if (svg) return svg.closest('div[role="button"]') || svg.closest('button');
-        return null;
+        return svg ? svg.closest('div[role="button"]') || svg.closest('button') : null;
     }
 
-    // ----- Find confirmation button -----
     function findConfirmButton() {
         for (const d of document.querySelectorAll('div[role="dialog"]')) {
             const btn = Array.from(d.querySelectorAll('button, div[role="button"]'))
@@ -57,94 +86,84 @@
         return null;
     }
 
-    // ----- Get all message containers -----
     function getMessages() {
-        return document.querySelectorAll('div[role="group"]');
+        return Array.from(document.querySelectorAll('div[role="group"]'));
     }
 
-    // ----- Scroll up to load older messages -----
-    async function scrollUp() {
-        // Find the scrollable container
-        const container = document.querySelector('div[role="list"]')?.closest?.('div[style*="overflow"]') ||
-                          document.querySelector('main')?.querySelector?.('div[style*="overflow"]') ||
-                          document.querySelector('[role="list"]')?.parentElement ||
-                          document.documentElement;
-        if (!container) return false;
-        const oldScroll = container.scrollTop;
-        container.scrollTop = Math.max(0, oldScroll - SCROLL_AMOUNT);
-        await wait(SCROLL_DELAY);
-        return container.scrollTop < oldScroll; // true if we scrolled
-    }
-
-    // ----- Main loop -----
-    console.log(`🔄 Starting (max ${MAX})...`);
+    // ---- Main loop ----
     let unsent = 0;
-    let noNewMessagesCount = 0;
 
     while (unsent < MAX) {
         const messages = getMessages();
         if (messages.length === 0) {
-            // No messages at all – try scrolling up
-            const scrolled = await scrollUp();
-            if (!scrolled) break;
+            const moved = await scrollUp();
+            if (!moved) break;
             continue;
         }
 
-        // Find the first message that hasn't been processed
+        // Find bottommost unprocessed message
         let targetMsg = null;
-        for (const msg of messages) {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const msg = messages[i];
             const id = getMessageId(msg);
-            if (!processedSet.has(id)) {
+            if (!processed.has(id)) {
                 targetMsg = msg;
                 break;
             }
         }
 
         if (!targetMsg) {
-            // All visible messages are processed – scroll up to load more
-            const scrolled = await scrollUp();
-            if (!scrolled) {
-                console.log('🏁 No more new messages – stopping.');
+            console.log('📜 All visible messages checked – loading older...');
+            const moved = await scrollUp();
+            if (!moved) {
+                console.log('🏁 No more messages.');
                 break;
             }
             continue;
         }
 
-        // Mark as processed immediately (even before we check if it's ours)
+        // Mark as processed
         const msgId = getMessageId(targetMsg);
-        processedSet.add(msgId);
+        processed.add(msgId);
 
-        // ---- Hover ----
+        // ---- Hover to reveal the three-dot button ----
         targetMsg.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
         targetMsg.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
         await wait(HOVER_WAIT);
 
+        // ---- Find the dot SVG and check if it's your message ----
         const dotSvg = targetMsg.querySelector('svg[aria-label*="See more options for message"]');
-        if (!dotSvg) {
-            // No dot button – skip (mark as processed already)
+        if (!dotSvg) continue; // no dot – skip
+
+        const label = dotSvg.getAttribute('aria-label') || '';
+        // Check if this message is from you (case‑insensitive)
+        if (!label.toLowerCase().includes('from ' + myUsername.toLowerCase())) {
+            // Not your message – skip (no menu opened)
             continue;
         }
+
+        // ---- Your message: click the dot button ----
         const dotBtn = dotSvg.closest('div[role="button"]');
         if (!dotBtn) continue;
 
         dotBtn.click();
         await wait(MENU_WAIT);
 
+        // ---- Find and click "Unsend" ----
         const unsendBtn = findUnsendButton();
         if (!unsendBtn) {
-            // Not your message – close menu and skip
-            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 }));
+            // Should not happen, but just in case
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape' }));
             await wait(300);
             continue;
         }
 
-        // ---- Click "Unsend" ----
         clickElement(unsendBtn);
         await wait(CONFIRM_WAIT);
 
         const confirmBtn = findConfirmButton();
         if (!confirmBtn) {
-            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 }));
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape' }));
             continue;
         }
 
